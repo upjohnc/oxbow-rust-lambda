@@ -6,20 +6,9 @@ variable "s3_bucket_arn" {
   description = "The ARN for the S3 bucket that the oxbow function will watch"
 }
 
-variable "aws_access_key" {
-  type    = string
-  default = ""
-}
-
-variable "aws_secret_key" {
-  type    = string
-  default = ""
-}
-
 provider "aws" {
-  region     = "us-west-2"
-  access_key = var.aws_access_key
-  secret_key = var.aws_secret_key
+  shared_config_files = ["$HOME/.aws/config"]
+  profile             = "AWSAdministratorAccess-851725189729"
 
   default_tags {
     tags = {

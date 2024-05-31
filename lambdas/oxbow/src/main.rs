@@ -7,7 +7,7 @@ use aws_lambda_events::sqs::SqsEvent;
 use deltalake::DeltaTableError;
 use lambda_runtime::{service_fn, Error, LambdaEvent};
 use serde_json::Value;
-use tracing::log::*;
+use tracing::{info, log::*};
 use url::Url;
 
 use oxbow_lambda_shared::*;
@@ -31,6 +31,7 @@ async fn main() -> Result<(), anyhow::Error> {
 }
 
 async fn func<'a>(event: LambdaEvent<SqsEvent>) -> Result<Value, Error> {
+    deltalake_aws::register_handlers(None);
     debug!("Receiving event: {:?}", event);
     let can_evolve_schema: bool = std::env::var("SCHEMA_EVOLUTION").is_ok();
     if can_evolve_schema {

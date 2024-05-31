@@ -1,3 +1,4 @@
+.venv/
 /target
 Cargo.lock
 .history
@@ -6,3 +7,7 @@ terraform.tfvars
 .terraform*
 terraform.tfstate*
 .env
+.envrc
+
+# no build artifacts
+*.zip

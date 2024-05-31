@@ -7,6 +7,25 @@ ifdef::env-github[]
 endif::[]
 :toc: macro
 
+= Chad Notes
+
+To create the lambda:
+.Deploy Lambda
+[source,bash]
+----
+% just cargo-lambda
+% just tf-init
+% just tf-plan
+% just tf-apply
+----
+
+Running:
+
+- add a folder for the table name in the bucket
+- add a parquet file in the new folder
+
+- Check that the delta table is set up: `python polar_read.py`
+
 = Oxbow
 
 Oxbow is a project to take an existing storage location which contains
