@@ -3,6 +3,7 @@ members = [
     "cli",
     "crates/*",
     "lambdas/*",
+    "local_add_file",
 ]
 resolver = "2"
 

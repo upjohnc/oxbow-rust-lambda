@@ -20,3 +20,6 @@ tf-destroy:
 bin := "oxbow-lambda"
 cargo-lambda:
     cargo lambda build --release --arm64 --output-format zip --bin {{ bin }}
+
+run-local-file:
+    cargo run --manifest-path local_add_file/Cargo.toml

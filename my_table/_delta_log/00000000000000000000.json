@@ -1,4 +1,44 @@
-{"protocol":{"minReaderVersion":1,"minWriterVersion":1}}
-{"metaData":{"id":"1d1aaf30-24f0-4408-b0f0-9e7aa4167e02","name":null,"description":null,"format":{"provider":"parquet","options":{}},"schemaString":"{\"type\":\"struct\",\"fields\":[{\"name\":\"id\",\"type\":\"long\",\"nullable\":true,\"metadata\":{}},{\"name\":\"name\",\"type\":\"string\",\"nullable\":true,\"metadata\":{}},{\"name\":\"amount\",\"type\":\"long\",\"nullable\":true,\"metadata\":{}}]}","partitionColumns":[],"createdTime":1717096985203,"configuration":{}}}
-{"add":{"path":"feed_1.parquet","size":1149,"partitionValues":{},"modificationTime":1717095595081,"dataChange":true,"stats":null}}
-{"commitInfo":{"timestamp":1717096985203,"operation":"CREATE TABLE","operationParameters":{"metadata":"{\"configuration\":{},\"created_time\":1717096985203,\"description\":null,\"format\":{\"options\":{},\"provider\":\"parquet\"},\"id\":\"1d1aaf30-24f0-4408-b0f0-9e7aa4167e02\",\"name\":null,\"partition_columns\":[],\"schema\":{\"fields\":[{\"metadata\":{},\"name\":\"id\",\"nullable\":true,\"type\":\"long\"},{\"metadata\":{},\"name\":\"name\",\"nullable\":true,\"type\":\"string\"},{\"metadata\":{},\"name\":\"amount\",\"nullable\":true,\"type\":\"long\"}],\"type\":\"struct\"}}","location":"file:///Users/charlesupjohn/projects/rust_learning/oxbow/my_table","mode":"Ignore","protocol":"{\"minReaderVersion\":1,\"minWriterVersion\":1}"},"clientVersion":"delta-rs.0.16.5"}}
+{
+    "protocol": {
+        "minReaderVersion": 1,
+        "minWriterVersion": 1
+    }
+}
+{
+    "metaData": {
+        "id": "6a5394fe-6c77-4548-a0bf-4877153ceb44",
+        "name": null,
+        "description": null,
+        "format": {
+            "provider": "parquet",
+            "options": {}
+        },
+        "schemaString": "{\"type\":\"struct\",\"fields\":[{\"name\":\"id\",\"type\":\"long\",\"nullable\":true,\"metadata\":{}},{\"name\":\"name\",\"type\":\"string\",\"nullable\":true,\"metadata\":{}},{\"name\":\"amount\",\"type\":\"long\",\"nullable\":true,\"metadata\":{}}]}",
+        "partitionColumns": [],
+        "createdTime": 1717288097452,
+        "configuration": {}
+    }
+}
+{
+    "add": {
+        "path": "feed_1.parquet",
+        "size": 1149,
+        "partitionValues": {},
+        "modificationTime": 1717182814269,
+        "dataChange": true,
+        "stats": null
+    }
+}
+{
+    "commitInfo": {
+        "timestamp": 1717288097452,
+        "operation": "CREATE TABLE",
+        "operationParameters": {
+            "metadata": "{\"configuration\":{},\"created_time\":1717288097452,\"description\":null,\"format\":{\"options\":{},\"provider\":\"parquet\"},\"id\":\"6a5394fe-6c77-4548-a0bf-4877153ceb44\",\"name\":null,\"partition_columns\":[],\"schema\":{\"fields\":[{\"metadata\":{},\"name\":\"id\",\"nullable\":true,\"type\":\"long\"},{\"metadata\":{},\"name\":\"name\",\"nullable\":true,\"type\":\"string\"},{\"metadata\":{},\"name\":\"amount\",\"nullable\":true,\"type\":\"long\"}],\"type\":\"struct\"}}",
+            "protocol": "{\"minReaderVersion\":1,\"minWriterVersion\":1}",
+            "location": "file:///Users/charlesupjohn/projects/rust_learning/oxbow/my_table",
+            "mode": "Ignore"
+        },
+        "clientVersion": "delta-rs.0.16.5"
+    }
+}

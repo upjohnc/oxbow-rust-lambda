@@ -4,6 +4,10 @@ import sys
 import polars as pl
 
 
+def read_local():
+    print(pl.read_delta("./my_table"))
+
+
 def read_s3():
     storage_options = {
         "AWS_ACCESS_KEY_ID": os.environ["AWS_ACCESS_KEY_ID"].strip(),
@@ -19,4 +23,5 @@ def read_s3():
 
 
 if __name__ == "__main__":
-    read_s3()
+    # read_s3()
+    read_local()
