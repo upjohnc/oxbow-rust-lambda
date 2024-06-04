@@ -8,6 +8,7 @@ deltalake = { version = "0.17.3", features = ["datafusion"] }
 deltalake-aws = { version = "0.1.1" }
 tokio = { workspace = true, features = ["full"] }
 url = { workspace = true }
+chrono = { version = "0.4.38" }
 
 [[bin]]
 name = "local-add"

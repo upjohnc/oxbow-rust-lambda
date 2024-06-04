@@ -11,3 +11,6 @@ terraform.tfstate*
 
 # no build artifacts
 *.zip
+
+# leave the delta table out of the commit
+my_table/

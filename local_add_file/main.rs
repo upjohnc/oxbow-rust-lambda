@@ -1,45 +1,81 @@
+use chrono::{DateTime, NaiveDate, NaiveDateTime, NaiveTime, Utc};
+use core::panic;
+use deltalake::arrow::datatypes::Schema as ArrowSchema;
+use deltalake::arrow::datatypes::{Field, SchemaRef};
 use deltalake::kernel::{models::Add, Action::Add as ActionAdd};
-use deltalake::operations::transaction::FinalizedCommit;
+use deltalake::kernel::{Schema, StructField};
 use deltalake::operations::transaction::CommitBuilder;
+use deltalake::operations::transaction::FinalizedCommit;
+use deltalake::parquet::arrow::async_reader::ParquetObjectReader;
+use deltalake::parquet::arrow::ParquetRecordBatchStreamBuilder;
 use deltalake::protocol::DeltaOperation;
+use deltalake::storage::object_store::local::LocalFileSystem;
+use deltalake::{open_table, DeltaOps, DeltaTable, DeltaTableError, ObjectMeta, Path};
 use std::collections::HashMap;
 use std::ffi::OsStr;
 use std::fs;
 use std::path::PathBuf;
+use std::sync::Arc;
 use std::time::SystemTime;
-
-use deltalake::{open_table, DeltaTable};
 
 #[tokio::main]
 async fn main() {
     let table_location = "./my_table";
-
-    let table = open_table(&table_location).await.unwrap();
-
-    let new_files = get_new_files(&table_location).await;
-    let new_add : Vec<_>= new_files.iter().map(create_add).map(ActionAdd).collect();
-
-    let finalized_commit = commit_new_files(new_add, table).await;
-    match finalized_commit {
-        Some(x) => println!("Version # : {:?}", x.version),
-        _ => println!("No new files")
+    enum TableOutput {
+        FinalizedCommit(FinalizedCommit),
+        DeltaTable(DeltaTable),
     }
 
+    let table: TableOutput = match open_table(&table_location).await {
+        Ok(the_table) => {
+            let new_files = get_new_files(&table_location).await;
+            let new_add: Vec<_> = new_files.iter().map(create_add).map(ActionAdd).collect();
+
+            let finalized_commit = commit_new_files(new_add, the_table).await;
+            TableOutput::FinalizedCommit(finalized_commit.expect("Commit should work"))
+        }
+        Err(DeltaTableError::InvalidTableLocation(_)) | Err(DeltaTableError::NotATable(_)) => {
+            let columns = get_columns_schema().await;
+            let new_files = get_all_files(&table_location);
+            let actions: Vec<_> = new_files.iter().map(create_add).map(ActionAdd).collect();
+            let output = DeltaOps::try_from_uri(&table_location)
+                .await
+                .unwrap()
+                .create()
+                .with_columns(columns)
+                .with_actions(actions)
+                .await
+                .unwrap();
+            TableOutput::DeltaTable(output)
+        }
+        Err(err) => panic!("{:?}", err),
+    };
+
+    let table_version = match table {
+        TableOutput::FinalizedCommit(x) => x.version,
+        TableOutput::DeltaTable(y) => y.version(),
+    };
+    println!("Version # : {}", table_version);
     println!("Complete");
 }
 
-async fn get_new_files(table_location: &str) -> Vec<PathBuf> {
-    let t = open_table(table_location).await.unwrap();
-    let existing = t.get_file_uris().unwrap().collect::<Vec<String>>().join("");
-
+fn get_all_files(table_location: &str) -> Vec<PathBuf> {
     let mut parquet_files = vec![];
-
     for path in fs::read_dir(table_location).unwrap() {
         let path = path.unwrap().path();
         if let Some("parquet") = path.extension().and_then(OsStr::to_str) {
             parquet_files.push(path.to_owned());
         }
     }
+    parquet_files
+}
+
+async fn get_new_files(table_location: &str) -> Vec<PathBuf> {
+    let t = open_table(table_location).await.unwrap();
+    let existing = t.get_file_uris().unwrap().collect::<Vec<String>>().join("");
+
+    let parquet_files = get_all_files(table_location);
+
     parquet_files
         .into_iter()
         .filter(|x| !existing.contains(x.file_name().unwrap().to_str().unwrap()))
@@ -73,10 +109,12 @@ fn create_add(file: &PathBuf) -> Add {
     }
 }
 
-
-async fn commit_new_files(a: Vec<deltalake::kernel::Action>, table: DeltaTable)-> Option<FinalizedCommit> {
+async fn commit_new_files(
+    a: Vec<deltalake::kernel::Action>,
+    table: DeltaTable,
+) -> Option<FinalizedCommit> {
     if a.len() == 0 {
-        return None
+        return None;
     }
     let temp_thing = table.clone();
     let table_reference = temp_thing.state.unwrap();
@@ -87,5 +125,71 @@ async fn commit_new_files(a: Vec<deltalake::kernel::Action>, table: DeltaTable)-
         log_it,
         DeltaOperation::Update { predicate: None },
     );
-     Some(pre_commit.expect("Finalize Fail").await.unwrap())
+    Some(pre_commit.expect("Finalize Fail").await.unwrap())
+}
+
+async fn get_schema() -> SchemaRef {
+    let pp = Path::parse("feed_1.parquet").expect("go");
+    let p = PathBuf::from("./my_table");
+    let z = Arc::new(LocalFileSystem::new_with_prefix(p).expect("Local System thing"));
+    let d = NaiveDate::from_ymd_opt(2015, 6, 3).unwrap();
+    let t = NaiveTime::from_hms_milli_opt(12, 34, 56, 789).unwrap();
+    let ndt = NaiveDateTime::new(d, t);
+    let dt = DateTime::from_naive_utc_and_offset(ndt, Utc);
+    let o = ObjectMeta {
+        location: pp,
+        last_modified: dt,
+        size: 1149,
+        e_tag: None,
+        version: None,
+    };
+    let m = ParquetObjectReader::new(z, o);
+    ParquetRecordBatchStreamBuilder::new(m)
+        .await
+        .unwrap()
+        .build()
+        .unwrap()
+        .schema()
+        .clone()
+}
+
+fn coerce_field(
+    field: deltalake::arrow::datatypes::FieldRef,
+) -> deltalake::arrow::datatypes::FieldRef {
+    match field.data_type() {
+        deltalake::arrow::datatypes::DataType::Timestamp(unit, tz) => match unit {
+            deltalake::arrow::datatypes::TimeUnit::Millisecond => {
+                println!("I have been asked to create a table with a Timestamp(millis) column ({}) that I cannot handle. Cowardly setting the Delta schema to pretend it is a Timestamp(micros)", field.name());
+                let field = deltalake::arrow::datatypes::Field::new(
+                    field.name(),
+                    deltalake::arrow::datatypes::DataType::Timestamp(
+                        deltalake::arrow::datatypes::TimeUnit::Microsecond,
+                        tz.clone(),
+                    ),
+                    field.is_nullable(),
+                );
+                return Arc::new(field);
+            }
+            _ => {}
+        },
+        _ => {}
+    };
+    field.clone()
+}
+
+async fn get_columns_schema() -> Vec<StructField> {
+    let arrow_schema_1 = get_schema().await;
+
+    let mut conversions: Vec<Arc<Field>> = vec![];
+
+    for field in arrow_schema_1.fields().iter() {
+        conversions.push(coerce_field(field.clone()));
+    }
+
+    let arrow_schema = ArrowSchema::new_with_metadata(conversions, arrow_schema_1.metadata.clone());
+
+    let schema = Schema::try_from(&arrow_schema);
+
+    let columns = schema.unwrap().fields().clone();
+    columns
 }
