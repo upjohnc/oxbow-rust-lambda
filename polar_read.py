@@ -23,5 +23,11 @@ def read_s3():
 
 
 if __name__ == "__main__":
-    # read_s3()
-    read_local()
+    data_locale = "local"
+    if len(sys.argv) > 1 and sys.argv[1] in ["local", "s3"]:
+        data_locale = sys.argv[1]
+
+    if data_locale == "s3":
+        read_s3()
+    else:
+        read_local()

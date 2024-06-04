@@ -7,24 +7,9 @@ ifdef::env-github[]
 endif::[]
 :toc: macro
 
-= Chad Notes
+= Pinnacle Solution Group Code
 
-To create the lambda:
-.Deploy Lambda
-[source,bash]
-----
-% just cargo-lambda
-% just tf-init
-% just tf-plan
-% just tf-apply
-----
-
-Running:
-
-- add a folder for the table name in the bucket
-- add a parquet file in the new folder
-
-- Check that the delta table is set up: `python polar_read.py`
+Description of the added code is at `./README_pinnacle.md`
 
 = Oxbow
 

@@ -21,5 +21,12 @@ bin := "oxbow-lambda"
 cargo-lambda:
     cargo lambda build --release --arm64 --output-format zip --bin {{ bin }}
 
+read-s3:
+    python polar_read.py s3
+
+# Run locally
 run-local-file:
     cargo run --manifest-path local_add_file/Cargo.toml
+
+read-local:
+    python polar_read.py s3
