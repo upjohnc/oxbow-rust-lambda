@@ -193,3 +193,44 @@ async fn get_columns_schema() -> Vec<StructField> {
     let columns = schema.unwrap().fields().clone();
     columns
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use fs_extra::{copy_items, dir::CopyOptions};
+    use std::fs::canonicalize;
+    use std::path::Path;
+
+    #[tokio::test]
+    async fn test_get_all_files() {
+        let dir_base = "tests/data_local_file";
+        let table_path = "parquet_files";
+        let path = canonicalize(&format!("../{}/{}", dir_base, table_path))
+            .expect("Failed to canonicalize");
+        let dir = tempfile::tempdir().expect("Failed to create temp dir");
+
+        let options = CopyOptions::new();
+        let _ = copy_items(&[path.as_path()], dir.path(), &options).expect("Failed to copy items");
+
+        let result = get_all_files(dir.path().join(Path::new(table_path)).to_str().unwrap());
+
+        assert_eq!(result.len(), 2);
+    }
+
+    #[tokio::test]
+    async fn test_get_new_files() {
+        let dir_base = "tests/data_local_file";
+        let table_path = "parquet_files_with_table";
+        let path = canonicalize(&format!("../{}/{}", dir_base, table_path))
+            .expect("Failed to canonicalize");
+        let dir = tempfile::tempdir().expect("Failed to create temp dir");
+
+        let options = CopyOptions::new();
+        let table_path = Path::new(table_path);
+        let _ = copy_items(&[path.as_path()], dir.path(), &options);
+
+        let result = get_new_files(&dir.path().join(table_path).to_str().unwrap()).await;
+
+        assert_eq!(1, result.len());
+    }
+}

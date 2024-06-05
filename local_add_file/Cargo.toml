@@ -10,6 +10,10 @@ tokio = { workspace = true, features = ["full"] }
 url = { workspace = true }
 chrono = { version = "0.4.38" }
 
+[dev-dependencies]
+fs_extra = "=1"
+tempfile = "*"
+
 [[bin]]
 name = "local-add"
 path = "./main.rs"
