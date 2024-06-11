@@ -133,69 +133,45 @@ struct PathMeta {
 }
 
 impl PathMeta {
-    fn thing(t: fs::DirEntry) -> Self {
+    fn convert(t: fs::DirEntry) -> Self {
         Self {
-            file_path: t.path(), //.strip_prefix("my_table").unwrap().to_path_buf(),
+            file_path: t.path(),
             size: t.metadata().unwrap().len(),
         }
     }
 }
 
-// .strip_prefix
-fn find_smallest_file(dir: PathBuf) -> Option<(DtlPath, PathMeta)> {
+fn find_parquet_file(dir: PathBuf) -> Option<(DtlPath, PathMeta)> {
     let mut my_end = vec![];
     for file in fs::read_dir(dir.as_path()).unwrap() {
-        let new = PathMeta::thing(file.unwrap());
+        let new = PathMeta::convert(file.unwrap());
         my_end.push(new);
     }
     if my_end.len() == 0 {
         return None;
     }
     let file_used = my_end[0].clone();
-    let file_used_2 = my_end[0].clone();
-    // let thing = match file_used.file_path.strip_prefix(".") {
-    //     Ok(x) => x.to_str().unwrap(),
-    //     Err(_) => file_used.file_path.as_path().to_str().unwrap(),
-    // };
-    // let thing = match file_used.file_path.strip_prefix(".") {
-    //     Ok(x) => x.to_path_buf(),
-    //     Err(_) => file_used.file_path,
-    // };
-    // let more = match thing.strip_prefix("my_table") {
-    let dir_str = dir.as_path();
-    // let more = match thing.strip_prefix(dir_str) {
-    let more = match file_used.file_path.strip_prefix(dir_str) {
+    let file_name = match file_used.file_path.strip_prefix(dir.as_path()) {
         Ok(x) => x.to_str().unwrap(),
         Err(_) => file_used.file_path.as_path().to_str().unwrap(),
     };
-    // dbg!(thing);
-    // dbg!(DtlPath::parse(more));
-
-    // dbg!(DtlPath::parse(thing));
-    // dbg!(DtlPath::parse("feed_1.parquet"));
-    // dbg!(DtlPath::from_filesystem_path(file_used.file_path.clone().file_name().unwrap().to_str().unwrap()).expect("Expect parsed path"));
 
     Some((
-        DtlPath::parse(more).unwrap(),
-        // DtlPath::parse("feed_1.parquet").unwrap(),
-        // DtlPath::from_filesystem_path(file_used.file_path).expect("Expect parsed path"),
-        file_used_2,
+        DtlPath::parse(file_name).unwrap(),
+        file_used,
     ))
 }
 
 async fn get_schema(dir_prefix: PathBuf) -> SchemaRef {
-    // todo: find first file from path prefix
-    let thing = dir_prefix.clone();
-    let (file_path, file_meta) = find_smallest_file(thing).expect("Expect parsed path");
-    println!("{}", file_path);
-    // let file_path: DtlPath = DtlPath::parse("feed_1.parquet").expect("Expect parsed path");
+    let (file_path, file_meta) = find_parquet_file(dir_prefix.clone()).expect("Expect parsed path");
     let local_file =
         Arc::new(LocalFileSystem::new_with_prefix(dir_prefix.clone()).expect("Local System thing"));
+
     let d = NaiveDate::from_ymd_opt(2015, 6, 3).unwrap();
     let t = NaiveTime::from_hms_milli_opt(12, 34, 56, 789).unwrap();
     let ndt = NaiveDateTime::new(d, t);
     let dt = DateTime::from_naive_utc_and_offset(ndt, Utc);
-    // let file_size = 1149;
+
     let file_size = file_meta.size;
     let object_meta = ObjectMeta {
         location: file_path,
