@@ -1,16 +1,14 @@
 use chrono::{DateTime, NaiveDate, NaiveDateTime, NaiveTime, Utc};
 use core::panic;
-use deltalake::arrow::datatypes::Schema as ArrowSchema;
-use deltalake::arrow::datatypes::{Field, SchemaRef};
-use deltalake::kernel::{models::Add, Action::Add as ActionAdd};
-use deltalake::kernel::{Schema, StructField};
-use deltalake::operations::transaction::CommitBuilder;
-use deltalake::operations::transaction::FinalizedCommit;
-use deltalake::parquet::arrow::async_reader::ParquetObjectReader;
-use deltalake::parquet::arrow::ParquetRecordBatchStreamBuilder;
+use deltalake::arrow::datatypes::{Field, Schema as ArrowSchema, SchemaRef};
+use deltalake::kernel::{models::Add, Action::Add as ActionAdd, Schema, StructField};
+use deltalake::operations::transaction::{CommitBuilder, FinalizedCommit};
+use deltalake::parquet::arrow::{
+    async_reader::ParquetObjectReader, ParquetRecordBatchStreamBuilder,
+};
 use deltalake::protocol::DeltaOperation;
 use deltalake::storage::object_store::local::LocalFileSystem;
-use deltalake::{open_table, DeltaOps, DeltaTable, DeltaTableError, ObjectMeta, Path};
+use deltalake::{open_table, DeltaOps, DeltaTable, DeltaTableError, ObjectMeta, Path as DtlPath};
 use std::collections::HashMap;
 use std::ffi::OsStr;
 use std::fs;
@@ -35,7 +33,7 @@ async fn main() {
             TableOutput::FinalizedCommit(finalized_commit.expect("Commit should work"))
         }
         Err(DeltaTableError::InvalidTableLocation(_)) | Err(DeltaTableError::NotATable(_)) => {
-            let columns = get_columns_schema().await;
+            let columns = get_columns_schema(PathBuf::from(table_location)).await;
             let new_files = get_all_files(&table_location);
             let actions: Vec<_> = new_files.iter().map(create_add).map(ActionAdd).collect();
             let output = DeltaOps::try_from_uri(&table_location)
@@ -116,11 +114,11 @@ async fn commit_new_files(
     if a.len() == 0 {
         return None;
     }
-    let temp_thing = table.clone();
-    let table_reference = temp_thing.state.unwrap();
-    let c = CommitBuilder::default().with_actions(a);
+    let temp_table = table.clone();
+    let table_reference = temp_table.state.unwrap();
+    let commit_builder = CommitBuilder::default().with_actions(a);
     let log_it = table.log_store();
-    let pre_commit = c.build(
+    let pre_commit = commit_builder.build(
         Some(&table_reference),
         log_it,
         DeltaOperation::Update { predicate: None },
@@ -128,23 +126,86 @@ async fn commit_new_files(
     Some(pre_commit.expect("Finalize Fail").await.unwrap())
 }
 
-async fn get_schema() -> SchemaRef {
-    let pp = Path::parse("feed_1.parquet").expect("go");
-    let p = PathBuf::from("./my_table");
-    let z = Arc::new(LocalFileSystem::new_with_prefix(p).expect("Local System thing"));
+#[derive(Clone, Debug)]
+struct PathMeta {
+    file_path: PathBuf,
+    size: u64,
+}
+
+impl PathMeta {
+    fn thing(t: fs::DirEntry) -> Self {
+        Self {
+            file_path: t.path(), //.strip_prefix("my_table").unwrap().to_path_buf(),
+            size: t.metadata().unwrap().len(),
+        }
+    }
+}
+
+// .strip_prefix
+fn find_smallest_file(dir: PathBuf) -> Option<(DtlPath, PathMeta)> {
+    let mut my_end = vec![];
+    for file in fs::read_dir(dir.as_path()).unwrap() {
+        let new = PathMeta::thing(file.unwrap());
+        my_end.push(new);
+    }
+    if my_end.len() == 0 {
+        return None;
+    }
+    let file_used = my_end[0].clone();
+    let file_used_2 = my_end[0].clone();
+    // let thing = match file_used.file_path.strip_prefix(".") {
+    //     Ok(x) => x.to_str().unwrap(),
+    //     Err(_) => file_used.file_path.as_path().to_str().unwrap(),
+    // };
+    // let thing = match file_used.file_path.strip_prefix(".") {
+    //     Ok(x) => x.to_path_buf(),
+    //     Err(_) => file_used.file_path,
+    // };
+    // let more = match thing.strip_prefix("my_table") {
+    let dir_str = dir.as_path();
+    // let more = match thing.strip_prefix(dir_str) {
+    let more = match file_used.file_path.strip_prefix(dir_str) {
+        Ok(x) => x.to_str().unwrap(),
+        Err(_) => file_used.file_path.as_path().to_str().unwrap(),
+    };
+    // dbg!(thing);
+    // dbg!(DtlPath::parse(more));
+
+    // dbg!(DtlPath::parse(thing));
+    // dbg!(DtlPath::parse("feed_1.parquet"));
+    // dbg!(DtlPath::from_filesystem_path(file_used.file_path.clone().file_name().unwrap().to_str().unwrap()).expect("Expect parsed path"));
+
+    Some((
+        DtlPath::parse(more).unwrap(),
+        // DtlPath::parse("feed_1.parquet").unwrap(),
+        // DtlPath::from_filesystem_path(file_used.file_path).expect("Expect parsed path"),
+        file_used_2,
+    ))
+}
+
+async fn get_schema(dir_prefix: PathBuf) -> SchemaRef {
+    // todo: find first file from path prefix
+    let thing = dir_prefix.clone();
+    let (file_path, file_meta) = find_smallest_file(thing).expect("Expect parsed path");
+    println!("{}", file_path);
+    // let file_path: DtlPath = DtlPath::parse("feed_1.parquet").expect("Expect parsed path");
+    let local_file =
+        Arc::new(LocalFileSystem::new_with_prefix(dir_prefix.clone()).expect("Local System thing"));
     let d = NaiveDate::from_ymd_opt(2015, 6, 3).unwrap();
     let t = NaiveTime::from_hms_milli_opt(12, 34, 56, 789).unwrap();
     let ndt = NaiveDateTime::new(d, t);
     let dt = DateTime::from_naive_utc_and_offset(ndt, Utc);
-    let o = ObjectMeta {
-        location: pp,
+    // let file_size = 1149;
+    let file_size = file_meta.size;
+    let object_meta = ObjectMeta {
+        location: file_path,
         last_modified: dt,
-        size: 1149,
+        size: file_size as usize,
         e_tag: None,
         version: None,
     };
-    let m = ParquetObjectReader::new(z, o);
-    ParquetRecordBatchStreamBuilder::new(m)
+    let parquet_object = ParquetObjectReader::new(local_file, object_meta);
+    ParquetRecordBatchStreamBuilder::new(parquet_object)
         .await
         .unwrap()
         .build()
@@ -177,8 +238,8 @@ fn coerce_field(
     field.clone()
 }
 
-async fn get_columns_schema() -> Vec<StructField> {
-    let arrow_schema_1 = get_schema().await;
+async fn get_columns_schema(table_prefix: PathBuf) -> Vec<StructField> {
+    let arrow_schema_1 = get_schema(table_prefix).await;
 
     let mut conversions: Vec<Arc<Field>> = vec![];
 
@@ -200,6 +261,12 @@ mod tests {
     use fs_extra::{copy_items, dir::CopyOptions};
     use std::fs::canonicalize;
     use std::path::Path;
+
+    #[tokio::test]
+    async fn test_get_schema() {
+        // todo : add test
+        assert_eq!(1, 1);
+    }
 
     #[tokio::test]
     async fn test_get_all_files() {
