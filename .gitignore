@@ -8,6 +8,7 @@ terraform.tfvars
 terraform.tfstate*
 .env
 .envrc
+.DS_Store
 
 # no build artifacts
 *.zip

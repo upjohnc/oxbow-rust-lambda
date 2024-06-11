@@ -29,7 +29,7 @@ run-local-file:
     cargo run --manifest-path local_add_file/Cargo.toml
 
 read-local:
-    python polar_read.py s3
+    python polar_read.py local
 
 # Test locally
 test-local-file:

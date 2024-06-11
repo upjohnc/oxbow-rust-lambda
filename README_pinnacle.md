@@ -41,7 +41,7 @@ When the code is run, if a delta table does not exist, then one is created.
 Like the lambda code, the parquet file is not read into memory.
 
 ```text
-- create directory `my_table`
+- create directory `my_table` (hardcoded in the main function of rust)
 - add a parquet file from the `hold_data` directory into `my_table`
 - run the code to create a new delta table : `just run-local-file`
 - check that the table is created by reading the table: `just read-local`
