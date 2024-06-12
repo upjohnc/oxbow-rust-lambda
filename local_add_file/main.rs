@@ -11,7 +11,7 @@ use deltalake::storage::object_store::local::LocalFileSystem;
 use deltalake::{open_table, DeltaOps, DeltaTable, DeltaTableError, ObjectMeta, Path as DtlPath};
 use std::collections::HashMap;
 use std::ffi::OsStr;
-use std::fs;
+use std::fs::{self, DirEntry};
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::SystemTime;
@@ -132,11 +132,11 @@ struct PathMeta {
     size: u64,
 }
 
-impl PathMeta {
-    fn convert(t: fs::DirEntry) -> Self {
+impl From<DirEntry> for PathMeta {
+    fn from(x: DirEntry) -> Self {
         Self {
-            file_path: t.path(),
-            size: t.metadata().unwrap().len(),
+            file_path: x.path(),
+            size: x.metadata().unwrap().len(),
         }
     }
 }
@@ -144,7 +144,7 @@ impl PathMeta {
 fn find_parquet_file(dir: PathBuf) -> Option<(DtlPath, PathMeta)> {
     let mut my_end = vec![];
     for file in fs::read_dir(dir.as_path()).unwrap() {
-        let new = PathMeta::convert(file.unwrap());
+        let new = PathMeta::from(file.unwrap());
         my_end.push(new);
     }
     if my_end.len() == 0 {
@@ -156,10 +156,7 @@ fn find_parquet_file(dir: PathBuf) -> Option<(DtlPath, PathMeta)> {
         Err(_) => file_used.file_path.as_path().to_str().unwrap(),
     };
 
-    Some((
-        DtlPath::parse(file_name).unwrap(),
-        file_used,
-    ))
+    Some((DtlPath::parse(file_name).unwrap(), file_used))
 }
 
 async fn get_schema(dir_prefix: PathBuf) -> SchemaRef {
@@ -275,5 +272,23 @@ mod tests {
         let result = get_new_files(&dir.path().join(table_path).to_str().unwrap()).await;
 
         assert_eq!(1, result.len());
+    }
+
+    #[test]
+    fn test_path_meta_from() {
+        let my_end = fs::read_dir(Path::new("../tests/fs_file"))
+            .unwrap()
+            .into_iter()
+            .map(|x| PathMeta::from(x.unwrap()))
+            .collect::<Vec<_>>();
+
+        assert_eq!(1, my_end.len());
+
+        let test_element = &my_end[0];
+        assert_eq!(test_element.size, 1149);
+        assert_eq!(
+            test_element.file_path,
+            PathBuf::from("../tests/fs_file/feed_1.parquet")
+        );
     }
 }
