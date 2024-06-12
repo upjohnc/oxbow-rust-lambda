@@ -141,26 +141,40 @@ impl From<DirEntry> for PathMeta {
     }
 }
 
-fn find_parquet_file(dir: PathBuf) -> Option<(DtlPath, PathMeta)> {
-    let mut my_end = vec![];
-    for file in fs::read_dir(dir.as_path()).unwrap() {
-        let new = PathMeta::from(file.unwrap());
-        my_end.push(new);
-    }
-    if my_end.len() == 0 {
+// todo: change name
+fn my_thing(dir: PathBuf) -> Option<Vec<PathMeta>> {
+    let result_list_dir = fs::read_dir(dir.as_path())
+        .unwrap()
+        .into_iter()
+        .map(|x| PathMeta::from(x.unwrap()))
+        .collect::<Vec<_>>();
+    if result_list_dir.len() == 0 {
         return None;
     }
-    let file_used = my_end[0].clone();
-    let file_name = match file_used.file_path.strip_prefix(dir.as_path()) {
-        Ok(x) => x.to_str().unwrap(),
-        Err(_) => file_used.file_path.as_path().to_str().unwrap(),
-    };
 
-    Some((DtlPath::parse(file_name).unwrap(), file_used))
+    Some(result_list_dir)
+}
+fn find_smallest_file(files: Vec<PathMeta>, dir: PathBuf) -> Option<(DtlPath, PathMeta)> {
+    if files.len() == 0 {
+        return None;
+    }
+    let mut smallest = files[0].clone();
+    for file in files {
+        if file.size < smallest.size {
+            smallest = file.clone();
+        }
+    }
+    let file_name = match smallest.file_path.strip_prefix(dir.as_path()) {
+        Ok(x) => x.to_str().unwrap(),
+        Err(_) => smallest.file_path.as_path().to_str().unwrap(),
+    };
+    Some((DtlPath::parse(file_name).unwrap(), smallest))
 }
 
 async fn get_schema(dir_prefix: PathBuf) -> SchemaRef {
-    let (file_path, file_meta) = find_parquet_file(dir_prefix.clone()).expect("Expect parsed path");
+    let files = my_thing(dir_prefix.clone()).expect("Expect files in the directory");
+    let (file_path, file_meta) =
+        find_smallest_file(files, dir_prefix.clone()).expect("Expect parsed path");
     let local_file =
         Arc::new(LocalFileSystem::new_with_prefix(dir_prefix.clone()).expect("Local System thing"));
 
@@ -276,19 +290,43 @@ mod tests {
 
     #[test]
     fn test_path_meta_from() {
-        let my_end = fs::read_dir(Path::new("../tests/fs_file"))
+        let result_list_dir = fs::read_dir(Path::new("../tests/fs_file"))
             .unwrap()
             .into_iter()
             .map(|x| PathMeta::from(x.unwrap()))
             .collect::<Vec<_>>();
 
-        assert_eq!(1, my_end.len());
+        assert_eq!(1, result_list_dir.len());
 
-        let test_element = &my_end[0];
+        let test_element = &result_list_dir[0];
         assert_eq!(test_element.size, 1149);
         assert_eq!(
             test_element.file_path,
             PathBuf::from("../tests/fs_file/feed_1.parquet")
+        );
+    }
+
+    #[test]
+    fn test_path_meta_from_dir() {
+        let result_list_dir = my_thing(PathBuf::from("../tests/fs_file")).unwrap();
+        assert_eq!(1, result_list_dir.len());
+
+        let test_element = &result_list_dir[0];
+        assert_eq!(test_element.size, 1149);
+        assert_eq!(
+            test_element.file_path,
+            PathBuf::from("../tests/fs_file/feed_1.parquet")
+        );
+    }
+
+    #[test]
+    fn test_smallest_file() {
+        let dir = PathBuf::from("../tests/fs_smallest");
+        let files = my_thing(dir.clone()).unwrap();
+        let (_, result_file) = find_smallest_file(files, dir).unwrap();
+        assert_eq!(
+            result_file.file_path,
+            PathBuf::from("../tests/fs_smallest/small.txt")
         );
     }
 }
